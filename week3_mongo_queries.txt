@@ -1,0 +1,40 @@
+use student_success
+
+// 1. Student summary: profile plus their 2 most recent notes
+// notes are saved oldest to newest so -2 gets the last two
+db.students.findOne(
+  { studentId: "S1001" },
+  { _id: 0, studentId: 1, name: 1, email: 1, major: 1, advisingNotes: { $slice: -2 } }
+)
+
+// 2. Recent support visits: S1001's visits in the last 30 days
+// I hardcoded Aug 28, 2026 as the start date
+db.students.aggregate([
+  { $match: { studentId: "S1001" } },
+  { $project: {
+      _id: 0,
+      studentId: 1,
+      name: 1,
+      recentVisits: {
+        $filter: {
+          input: "$supportVisits",
+          as: "v",
+          cond: { $gte: ["$$v.date", ISODate("2026-08-28")] }
+        }
+      }
+  } }
+])
+
+// 3. High engagement: students with 3 or more support visits
+// $ifNull is there so it doesn't break if a student is missing the array
+db.students.aggregate([
+  { $project: {
+      _id: 0,
+      studentId: 1,
+      name: 1,
+      visitCount: { $size: { $ifNull: ["$supportVisits", []] } }
+  } },
+  { $match: { visitCount: { $gte: 3 } } }
+])
+
+// should return Amina Warsame (4) and Maria Lopez (3)
